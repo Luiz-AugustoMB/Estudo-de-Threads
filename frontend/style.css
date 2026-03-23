@@ -1,0 +1,323 @@
+/* ── Variáveis — identidade Inatel ──────────────────────────────────────── */
+:root {
+  --bg:           #091a3a;   /* fundo da página           */
+  --panel:        #102C54;   /* fundo dos painéis         */
+  --panel-dark:   #071529;   /* variante mais escura      */
+  --border:       #1e3f77;   /* bordas                    */
+  --primary:      #002cba;   /* azul Inatel primário      */
+  --primary-lit:  #0C5EE5;   /* azul Inatel claro         */
+  --text:         #e8f0fe;   /* texto principal           */
+  --text-muted:   #7ea8d8;   /* texto secundário          */
+  --text-dim:     #3d5a8a;   /* texto bem discreto        */
+  --danger:       #ef4444;
+  --success:      #22c55e;
+  --warning:      #f59e0b;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 16px;
+}
+
+/* ── Layout principal: 3 colunas ─────────────────────────────────────────── */
+#app {
+  max-width: 1140px;
+  margin: 0 auto;
+}
+
+#layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+/* ── Coluna 1: canvas + legenda ──────────────────────────────────────────── */
+#col-sim {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#sim-canvas {
+  display: block;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #091a3a;
+}
+
+/* Legenda horizontal abaixo do canvas */
+#legend-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 10px 14px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.chip {
+  width: 18px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.chip.moving      { background: #3b82f6; }
+.chip.in-critical { background: var(--warning); }
+.chip.collided    { background: var(--danger); }
+.chip.finished    { background: var(--success); }
+
+/* ── Coluna 2: controles + stats ─────────────────────────────────────────── */
+#col-controls {
+  width: 230px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Coluna 3: threads + log ─────────────────────────────────────────────── */
+#col-threads {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Panel genérico ──────────────────────────────────────────────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.panel h2 {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--primary-lit);
+  margin-bottom: 10px;
+}
+
+/* ── Inputs e label ──────────────────────────────────────────────────────── */
+label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+input[type="number"] {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--panel-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input[type="number"]:focus { border-color: var(--primary-lit); }
+
+/* ── Sliders ──────────────────────────────────────────────────────────────── */
+.slider-group { margin-bottom: 12px; }
+.slider-group label { margin-bottom: 4px; }
+.slider-group label strong { color: var(--text); }
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary-lit);
+  cursor: pointer;
+}
+.slider-hint {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* ── Botões ───────────────────────────────────────────────────────────────── */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 7px;
+  letter-spacing: 0.02em;
+  transition: filter 0.15s;
+}
+.btn:last-child  { margin-bottom: 0; }
+.btn:hover       { filter: brightness(1.18); }
+.btn:active      { filter: brightness(0.88); }
+.btn-primary     { background: var(--primary); color: #fff; }
+.btn-secondary   { background: var(--border);  color: var(--text-muted); }
+
+/* ── Estatísticas ─────────────────────────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.stat-item {
+  background: var(--panel-dark);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 6px;
+  text-align: center;
+}
+.stat-item.danger { border-color: #ef444440; }
+
+.stat-label {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+.stat-value {
+  display: block;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.danger .stat-value { color: var(--danger); }
+
+/* ── Status ───────────────────────────────────────────────────────────────── */
+#status-msg {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── Tabela de threads ────────────────────────────────────────────────────── */
+#thread-table-wrapper {
+  max-height: 210px;
+  overflow-y: auto;
+  border-radius: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+#thread-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+#thread-table thead th {
+  background: var(--panel-dark);
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 5px 8px;
+  text-align: left;
+  position: sticky;
+  top: 0;
+}
+#thread-table tbody td {
+  padding: 5px 8px;
+  border-top: 1px solid var(--panel-dark);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+#thread-table tbody tr:hover td { background: #0a1e44; }
+
+.ts-moving      { color: #3b82f6 !important; }
+.ts-in_critical { color: var(--warning) !important; font-weight: 600; }
+.ts-collided    { color: var(--danger)  !important; font-weight: 600; }
+.ts-finished    { color: var(--success) !important; opacity: 0.55; }
+
+.empty-row { color: var(--text-dim); font-style: italic; text-align: center; }
+
+/* ── Log de eventos ───────────────────────────────────────────────────────── */
+#log-panel { flex: 1; display: flex; flex-direction: column; }
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.log-header h2 { margin-bottom: 0; }
+
+.btn-small {
+  background: var(--border);
+  color: var(--text-muted);
+  border: none;
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.btn-small:hover { filter: brightness(1.25); }
+
+#log-list {
+  flex: 1;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.75rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.log-entry {
+  padding: 3px 6px;
+  border-radius: 3px;
+  line-height: 1.5;
+  animation: fadeIn 0.2s ease;
+}
+.log-empty { color: var(--text-dim); font-style: italic; font-size: 0.75rem; }
+
+.log-start     { color: var(--text-dim); }
+.log-enter     { color: var(--warning); }
+.log-exit      { color: var(--primary-lit); }
+.log-collision { color: var(--danger); font-weight: 600; background: rgba(239,68,68,0.08); }
+.log-stop      { color: var(--danger); }
+.log-finish    { color: var(--success); }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsivo ───────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  #layout { flex-wrap: wrap; }
+  #col-sim { width: 100%; align-items: center; }
+  #col-controls, #col-threads { flex: 1; min-width: 200px; }
+}
+
+@media (max-width: 560px) {
+  #sim-canvas { width: 340px; height: 340px; }
+  #col-controls, #col-threads { width: 100%; flex: none; }
+}
