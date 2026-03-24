@@ -122,8 +122,7 @@ class SimulationService:
             sx, sy, udx, udy = ROUTES[direction]
 
             # ── Velocidade individual por thread (aleatória por carro) ──────────
-            # Cada thread nasce com velocidade própria (px/passo), independente
-            # do slider — que controla apenas o ritmo global da simulação.
+            # Cada thread nasce com velocidade própria (px/passo), dentro de um intervalo.
             individual_speed = random.uniform(3.0, 6.0)
             dx = udx * individual_speed
             dy = udy * individual_speed
