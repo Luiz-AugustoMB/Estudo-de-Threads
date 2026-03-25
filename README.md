@@ -2,6 +2,8 @@
 
 Simulador visual de concorrencia usando threads em Python para demonstrar race condition em um cruzamento sem sincronismo.
 
+Projeto academico com foco em visualizacao pratica de concorrencia.
+
 O sistema possui:
 
 - Backend em FastAPI responsavel por iniciar, resetar e controlar a simulacao
@@ -182,7 +184,7 @@ Com o backend rodando, abra outra janela do terminal na raiz do projeto e execut
 
 ```powershell
 start .\frontend\index.html
-```
+``` 
 
 Tambem e possivel abrir manualmente o arquivo `frontend/index.html` no navegador.
 
