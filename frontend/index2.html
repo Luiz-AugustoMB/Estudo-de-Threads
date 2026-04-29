@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sincronismo de Threads — FCFS vs SJF</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    #app { max-width: 1440px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="layout">
+
+    <!-- ── Coluna 1: Simulação + Legenda ──────────────────────── -->
+    <div id="col-sim">
+      <canvas id="sim-canvas" width="500" height="500"></canvas>
+
+      <div class="panel" id="legend-panel">
+        <span class="legend-item"><span class="chip moving-car"></span>Carro em movimento</span>
+        <span class="legend-item"><span class="chip moving-truck"></span>Caminhao em movimento</span>
+        <span class="legend-item"><span class="chip waiting"></span>Aguardando semaforo</span>
+        <span class="legend-item"><span class="chip in-critical"></span>Na regiao critica</span>
+      </div>
+    </div>
+
+    <!-- ── Coluna 2: Controles + Semaforos + Estatisticas ─────── -->
+    <div id="col-controls">
+
+      <section class="panel">
+        <h2>Escalonamento</h2>
+        <p class="config-info">8 veiculos aleatorios · semaforos ativos</p>
+
+        <div class="sched-group">
+          <button id="btn-sched-fcfs" class="btn-sched active">FCFS</button>
+          <button id="btn-sched-sjf"  class="btn-sched">SJF</button>
+        </div>
+        <p class="mode-note" id="mode-note">FCFS: atende na ordem de chegada.</p>
+
+        <button id="btn-start" class="btn btn-primary">Iniciar</button>
+        <button id="btn-reset" class="btn btn-secondary">Reiniciar</button>
+      </section>
+
+      <section class="panel">
+        <h2>Estatisticas</h2>
+        <div class="stat-grid">
+          <div class="stat-item">
+            <span class="stat-label">Veiculos</span>
+            <span class="stat-value" id="stat-total">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Travessias</span>
+            <span class="stat-value" id="stat-crossings">0</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Status</h2>
+        <p id="status-msg">Aguardando inicio...</p>
+      </section>
+
+    </div>
+
+    <!-- ── Coluna 3: Tabelas FCFS + SJF lado a lado + Log ─────── -->
+    <div id="col-threads">
+
+      <div id="tables-row">
+
+        <section class="panel table-panel">
+          <h2>FCFS <span class="table-badge badge-fcfs">First Come First Served</span></h2>
+          <div class="thread-table-wrapper">
+            <table class="thread-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Tipo</th>
+                  <th>Dir</th>
+                  <th>Vel</th>
+                  <th>T.Total</th>
+                  <th>T.Espera</th>
+                </tr>
+              </thead>
+              <tbody id="fcfs-tbody">
+                <tr><td colspan="6" class="empty-row">Nenhuma simulacao FCFS</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel table-panel">
+          <h2>SJF <span class="table-badge badge-sjf">Shortest Job First</span></h2>
+          <div class="thread-table-wrapper">
+            <table class="thread-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Tipo</th>
+                  <th>Dir</th>
+                  <th>Vel</th>
+                  <th>T.Total</th>
+                  <th>T.Espera</th>
+                </tr>
+              </thead>
+              <tbody id="sjf-tbody">
+                <tr><td colspan="6" class="empty-row">Nenhuma simulacao SJF</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+
+      <section class="panel" id="log-panel">
+        <div class="log-header">
+          <h2>Log de eventos</h2>
+          <button id="btn-clear-log" class="btn-small">Limpar</button>
+        </div>
+        <div id="log-list">
+          <span class="log-empty">Nenhum evento ainda...</span>
+        </div>
+      </section>
+
+    </div>
+
+  </div><!-- #layout -->
+</div><!-- #app -->
+<script src="script2.js"></script>
+</body>
+</html>

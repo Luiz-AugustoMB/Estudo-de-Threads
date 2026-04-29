@@ -3,67 +3,47 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title></title>
+  <title>Sincronismo de Threads - Cruzamento</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <div id="app">
   <div id="layout">
-
-    <!-- ── Coluna 1: Simulação + Legenda ──────────────────────────── -->
     <div id="col-sim">
       <canvas id="sim-canvas" width="500" height="500"></canvas>
 
       <div class="panel" id="legend-panel">
-        <span class="legend-item"><span class="chip moving"></span>Em movimento</span>
-        <span class="legend-item"><span class="chip in-critical"></span>Região crítica</span>
-        <span class="legend-item"><span class="chip collided"></span>Colidiu</span>
-        <span class="legend-item"><span class="chip finished"></span>Concluído</span>
+        <span class="legend-item"><span class="chip moving-car"></span>Carro em movimento</span>
+        <span class="legend-item"><span class="chip moving-truck"></span>Caminhao em movimento</span>
+        <span class="legend-item"><span class="chip waiting"></span>Aguardando semaforo</span>
+        <span class="legend-item"><span class="chip in-critical"></span>Na regiao critica</span>
+        <span class="legend-item"><span class="chip collided"></span>Colisao</span>
       </div>
     </div>
 
-    <!-- ── Coluna 2: Controles + Estatísticas ─────────────────────── -->
     <div id="col-controls">
-
       <section class="panel">
         <h2>Controles</h2>
-
-        <label for="num-cars">Número de carros (1–20):</label>
-        <input id="num-cars" type="number" min="1" max="20" value="4" />
-
-        <div class="slider-group">
-          <label>Velocidade da simulação: <strong id="speed-val">4</strong></label>
-          <input id="slider-speed" type="range" min="1" max="12" value="4" step="1" />
-          <div class="slider-hint"><span>lento</span><span>rápido</span></div>
-        </div>
-
-        <div class="slider-group">
-          <label>Dispersão de partida: <strong id="delay-val">3.5</strong>s</label>
-          <input id="slider-delay" type="range" min="0" max="6" value="3.5" step="0.1" />
-          <div class="slider-hint"><span>simultâneo</span><span>espalhado</span></div>
-        </div>
-
+        <p class="config-info">8 veiculos aleatorios a cada inicio</p>
+        <button id="btn-mode" class="btn btn-toggle btn-toggle-on">Semaforos: ON</button>
+        <p class="mode-note" id="mode-note">Modo sincronizado selecionado para o proximo inicio.</p>
         <button id="btn-start" class="btn btn-primary">Iniciar</button>
         <button id="btn-reset" class="btn btn-secondary">Reiniciar</button>
       </section>
 
       <section class="panel">
-        <h2>Estatísticas</h2>
+        <h2>Estatisticas</h2>
         <div class="stat-grid">
           <div class="stat-item">
-            <span class="stat-label">Total</span>
+            <span class="stat-label">Veiculos</span>
             <span class="stat-value" id="stat-total">0</span>
           </div>
           <div class="stat-item">
-            <span class="stat-label">Ativos</span>
-            <span class="stat-value" id="stat-active">0</span>
+            <span class="stat-label">Travessias</span>
+            <span class="stat-value" id="stat-crossings">0</span>
           </div>
-          <div class="stat-item">
-            <span class="stat-label">Concluídos</span>
-            <span class="stat-value" id="stat-finished">0</span>
-          </div>
-          <div class="stat-item danger">
-            <span class="stat-label">Colisões</span>
+          <div class="stat-item stat-full">
+            <span class="stat-label">Colisoes</span>
             <span class="stat-value" id="stat-collisions">0</span>
           </div>
         </div>
@@ -71,29 +51,27 @@
 
       <section class="panel">
         <h2>Status</h2>
-        <p id="status-msg">Aguardando início...</p>
+        <p id="status-msg">Aguardando inicio...</p>
       </section>
-
     </div>
 
-    <!-- ── Coluna 3: Threads + Log ────────────────────────────────── -->
     <div id="col-threads">
-
       <section class="panel">
-        <h2>Estado das Threads</h2>
+        <h2>Entrada de Threads</h2>
         <div id="thread-table-wrapper">
           <table id="thread-table">
             <thead>
               <tr>
-                <th>Thread</th>
+                <th>#</th>
+                <th>Tipo</th>
                 <th>Dir</th>
-                <th>Estado</th>
-                <th>Quadrante</th>
-                <th>Vel.</th>
+                <th>Status</th>
+                <th>Tempo Total</th>
+                <th>Tempo Espera</th>
               </tr>
             </thead>
             <tbody id="thread-tbody">
-              <tr><td colspan="5" class="empty-row">Nenhuma thread ativa</td></tr>
+              <tr><td colspan="6" class="empty-row">Nenhuma thread ativa</td></tr>
             </tbody>
           </table>
         </div>
@@ -108,11 +86,9 @@
           <span class="log-empty">Nenhum evento ainda...</span>
         </div>
       </section>
-
     </div>
-
-  </div><!-- #layout -->
-</div><!-- #app -->
+  </div>
+</div>
 <script src="script.js"></script>
 </body>
 </html>

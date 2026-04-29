@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 @dataclass
 class SimulationStats:
-    total_cars: int = 0
-    active_cars: int = 0
-    finished_cars: int = 0
-    collisions: int = 0
+    total_vehicles: int = 0
+    total_crossings: int = 0
+    total_collisions: int = 0

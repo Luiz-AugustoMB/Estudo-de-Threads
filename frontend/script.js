@@ -1,89 +1,188 @@
-// ── Configuração do backend ───────────────────────────────────────────────────
 const BACKEND_PORT = 8001;
 const BACKEND_HTTP = `http://localhost:${BACKEND_PORT}`;
-const BACKEND_WS   = `ws://localhost:${BACKEND_PORT}`;
+const BACKEND_WS = `ws://localhost:${BACKEND_PORT}`;
 
-// ── Elementos do DOM ──────────────────────────────────────────────────────────
-const canvas       = document.getElementById('sim-canvas');
-const ctx          = canvas.getContext('2d');
-const elTotal      = document.getElementById('stat-total');
-const elActive     = document.getElementById('stat-active');
-const elFinished   = document.getElementById('stat-finished');
+const canvas = document.getElementById('sim-canvas');
+const ctx = canvas.getContext('2d');
+const elTotal = document.getElementById('stat-total');
+const elCrossings = document.getElementById('stat-crossings');
 const elCollisions = document.getElementById('stat-collisions');
-const elStatus     = document.getElementById('status-msg');
-const btnStart     = document.getElementById('btn-start');
-const btnReset     = document.getElementById('btn-reset');
-const btnClearLog  = document.getElementById('btn-clear-log');
-const inputCars    = document.getElementById('num-cars');
-const sliderSpeed  = document.getElementById('slider-speed');
-const sliderDelay  = document.getElementById('slider-delay');
-const elDelayVal   = document.getElementById('delay-val');
-const elSpeedVal   = document.getElementById('speed-val');
-const threadTbody  = document.getElementById('thread-tbody');
-const logList      = document.getElementById('log-list');
+const elStatus = document.getElementById('status-msg');
+const btnStart = document.getElementById('btn-start');
+const btnReset = document.getElementById('btn-reset');
+const btnMode = document.getElementById('btn-mode');
+const btnClearLog = document.getElementById('btn-clear-log');
+const elModeNote = document.getElementById('mode-note');
+const threadTbody = document.getElementById('thread-tbody');
+const logList = document.getElementById('log-list');
 
-// ── Layout (deve coincidir com backend) ───────────────────────────────────────
-const W = canvas.width;    // 500
-const H = canvas.height;   // 500
-const CX = W / 2;          // 250
-const CY = H / 2;          // 250
-const ROAD_HALF = 60;      // meia-largura total da via → via = 120px
+const W = canvas.width;
+const H = canvas.height;
+const CX = W / 2;
+const CY = H / 2;
+const ROAD_HALF = 60;
 
-// Borda da região crítica (= borda da via)
-const CX1 = CX - ROAD_HALF;  // 190
-const CX2 = CX + ROAD_HALF;  // 310
-const CY1 = CY - ROAD_HALF;  // 190
-const CY2 = CY + ROAD_HALF;  // 310
+const CX1 = CX - ROAD_HALF;
+const CX2 = CX + ROAD_HALF;
+const CY1 = CY - ROAD_HALF;
+const CY2 = CY + ROAD_HALF;
 
-// Centros das 4 pistas (devem coincidir com ROUTES no backend)
 const LANE = {
-  north: { x: 220 },   // pista esquerda da via vertical  (desce)
-  south: { x: 280 },   // pista direita da via vertical   (sobe)
-  west:  { y: 220 },   // pista superior da via horizontal (vai →)
-  east:  { y: 280 },   // pista inferior da via horizontal (vai ←)
+  north: { x: 220 },
+  south: { x: 280 },
+  west: { y: 220 },
+  east: { y: 280 },
 };
 
-// ── Cores por estado ──────────────────────────────────────────────────────────
-const COLORS = {
-  moving:      '#3b82f6',
-  in_critical: '#f59e0b',
-  collided:    '#ef4444',
-  finished:    '#22c55e',
+const VEHICLE_SIZE = {
+  car: { w: 12, h: 18 },
+  truck: { w: 17, h: 26 },
 };
 
-// ── Estado global ─────────────────────────────────────────────────────────────
+const VEHICLE_NAME = { car: 'Carro', truck: 'Caminhao' };
+const DIR_LABEL = {
+  north: 'N->S',
+  south: 'S->N',
+  west: 'W->E',
+  east: 'E->W',
+};
+
+const DEFAULT_QUADRANTS = {
+  Q1: { free: true, holder: null },
+  Q2: { free: true, holder: null },
+  Q3: { free: true, holder: null },
+  Q4: { free: true, holder: null },
+};
+
 let simState = {
   running: false,
   cars: [],
-  stats: { total: 0, active: 0, finished: 0, collisions: 0 },
+  stats: {
+    total_vehicles: 0,
+    total_crossings: 0,
+    total_collisions: 0,
+    mode: 'sync',
+    sync_enabled: true,
+    quadrants: { ...DEFAULT_QUADRANTS },
+  },
   events: [],
 };
+
 let lastEventCount = 0;
 let localLog = [];
+let selectedSyncEnabled = true;
 
-// ── Sliders ───────────────────────────────────────────────────────────────────
-sliderSpeed.addEventListener('input', () => {
-  const level = parseInt(sliderSpeed.value);
-  elSpeedVal.textContent = level;
-  // Atualiza velocidade da simulação em tempo real, mesmo durante execução
-  fetch(`${BACKEND_HTTP}/api/speed`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ level }),
-  });
-});
-sliderDelay.addEventListener('input', () => {
-  elDelayVal.textContent = parseFloat(sliderDelay.value).toFixed(1);
-});
+const STATE_LABEL = {
+  moving: 'movendo',
+  waiting: 'aguardando',
+  in_critical: 'cruzamento',
+  collided: 'colidiu',
+  finished: 'concluido',
+};
 
-// ── WebSocket ─────────────────────────────────────────────────────────────────
+const QUAD_META = [
+  {
+    name: 'Q1',
+    label: 'N x W',
+    x: CX1,
+    y: CY1,
+    w: CX - CX1,
+    h: CY - CY1,
+    fill: 'rgba(59,130,246,0.10)',
+    stroke: 'rgba(59,130,246,0.50)',
+  },
+  {
+    name: 'Q2',
+    label: 'S x W',
+    x: CX,
+    y: CY1,
+    w: CX2 - CX,
+    h: CY - CY1,
+    fill: 'rgba(245,158,11,0.10)',
+    stroke: 'rgba(245,158,11,0.50)',
+  },
+  {
+    name: 'Q3',
+    label: 'N x E',
+    x: CX1,
+    y: CY,
+    w: CX - CX1,
+    h: CY2 - CY,
+    fill: 'rgba(34,197,94,0.10)',
+    stroke: 'rgba(34,197,94,0.50)',
+  },
+  {
+    name: 'Q4',
+    label: 'S x E',
+    x: CX,
+    y: CY,
+    w: CX2 - CX,
+    h: CY2 - CY,
+    fill: 'rgba(168,85,247,0.10)',
+    stroke: 'rgba(168,85,247,0.50)',
+  },
+];
+
+function vehicleColor(car) {
+  if (car.state === 'collided') return '#ef4444';
+  if (car.state === 'waiting') return '#f59e0b';
+  if (car.state === 'in_critical') return '#f97316';
+  if (car.state === 'finished') return '#374151';
+  return car.vehicle_type === 'truck' ? '#16a34a' : '#3b82f6';
+}
+
+function setStatus(msg) {
+  elStatus.textContent = msg;
+}
+
+function modeLabel(syncEnabled) {
+  return syncEnabled ? 'Semaforos ON' : 'Semaforos OFF';
+}
+
+function modeDescription(syncEnabled) {
+  return syncEnabled
+    ? 'sincronizado por quadrantes'
+    : 'livre, com colisao';
+}
+
+function refreshModeControls() {
+  btnMode.textContent = modeLabel(selectedSyncEnabled);
+  btnMode.classList.toggle('btn-toggle-on', selectedSyncEnabled);
+  btnMode.classList.toggle('btn-toggle-off', !selectedSyncEnabled);
+
+  const activeSyncEnabled = simState.stats?.sync_enabled ?? true;
+  if (simState.running) {
+    const activeText = activeSyncEnabled ? 'sincronizado' : 'sem sincronizacao';
+    const nextText = selectedSyncEnabled ? 'sincronizado' : 'sem sincronizacao';
+    elModeNote.textContent = `Modo atual: ${activeText}. A selecao ${nextText} vale para o proximo inicio.`;
+    return;
+  }
+
+  elModeNote.textContent = `Proximo inicio: ${modeDescription(selectedSyncEnabled)}.`;
+}
+
+function getQuadrants() {
+  return simState.stats?.quadrants ?? DEFAULT_QUADRANTS;
+}
+
 function connect() {
   const ws = new WebSocket(`${BACKEND_WS}/ws`);
-
   ws.onmessage = (ev) => {
     simState = JSON.parse(ev.data);
+    simState.stats = {
+      total_vehicles: simState.stats?.total_vehicles ?? 0,
+      total_crossings: simState.stats?.total_crossings ?? 0,
+      total_collisions: simState.stats?.total_collisions ?? 0,
+      mode: simState.stats?.mode ?? 'sync',
+      sync_enabled: simState.stats?.sync_enabled ?? true,
+      quadrants: {
+        ...DEFAULT_QUADRANTS,
+        ...(simState.stats?.quadrants ?? {}),
+      },
+    };
     refreshStats();
     refreshStatus();
+    refreshModeControls();
     refreshThreadTable();
     if (simState.events.length !== lastEventCount) {
       lastEventCount = simState.events.length;
@@ -91,21 +190,17 @@ function connect() {
       refreshLog();
     }
   };
-
-  ws.onclose = () => setStatus('Conexão encerrada. Recarregue a página.');
-  ws.onerror = () => setStatus(`Erro ao conectar (porta ${BACKEND_PORT}).`);
+  ws.onclose = () => setStatus('Conexao encerrada. Recarregue a pagina.');
+  ws.onerror = () => setStatus(`Erro ao conectar na porta ${BACKEND_PORT}.`);
 }
 
-// ── Controles ─────────────────────────────────────────────────────────────────
 btnStart.addEventListener('click', async () => {
-  const n     = parseInt(inputCars.value) || 4;
-  const delay = parseFloat(sliderDelay.value);
   localLog = [];
   lastEventCount = 0;
   await fetch(`${BACKEND_HTTP}/api/start`, {
-    method:  'POST',
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ num_cars: n, max_delay: delay }),
+    body: JSON.stringify({ sync_enabled: selectedSyncEnabled }),
   });
 });
 
@@ -113,8 +208,14 @@ btnReset.addEventListener('click', async () => {
   await fetch(`${BACKEND_HTTP}/api/reset`, { method: 'POST' });
   localLog = [];
   lastEventCount = 0;
-  threadTbody.innerHTML = '<tr><td colspan="5" class="empty-row">Nenhuma thread ativa</td></tr>';
+  refreshThreadTable();
   logList.innerHTML = '<span class="log-empty">Nenhum evento ainda...</span>';
+  refreshModeControls();
+});
+
+btnMode.addEventListener('click', () => {
+  selectedSyncEnabled = !selectedSyncEnabled;
+  refreshModeControls();
 });
 
 btnClearLog.addEventListener('click', () => {
@@ -122,267 +223,285 @@ btnClearLog.addEventListener('click', () => {
   logList.innerHTML = '<span class="log-empty">Log limpo.</span>';
 });
 
-// ── Estatísticas ──────────────────────────────────────────────────────────────
 function refreshStats() {
-  const s = simState.stats;
-  elTotal.textContent      = s.total;
-  elActive.textContent     = s.active;
-  elFinished.textContent   = s.finished;
-  elCollisions.textContent = s.collisions;
+  elTotal.textContent = simState.stats.total_vehicles;
+  elCrossings.textContent = simState.stats.total_crossings;
+  elCollisions.textContent = simState.stats.total_collisions;
 }
 
-function setStatus(msg) { elStatus.textContent = msg; }
-
 function refreshStatus() {
-  const s = simState.stats;
-  if (!simState.running && s.total === 0) {
-    setStatus('Aguardando início...');
-  } else if (simState.running && s.active > 0) {
-    setStatus(`Em andamento — ${s.active} thread(s) ativa(s).`);
-  } else if (s.total > 0 && s.active === 0) {
-    setStatus(s.collisions > 0
-      ? `Concluída. ${s.collisions} colisão(ões) — sem mutex = sem proteção.`
-      : `Concluída SEM colisões desta vez. Execute novamente para ver a variação.`);
+  const { running, stats, cars } = simState;
+  const activeSyncEnabled = stats.sync_enabled ?? true;
+  if (!running && stats.total_vehicles === 0) {
+    setStatus(`Aguardando inicio... ${modeLabel(selectedSyncEnabled)} selecionado.`);
+  } else if (running) {
+    setStatus(
+      activeSyncEnabled
+        ? 'Em andamento - semaforos ON sincronizando os quadrantes.'
+        : 'Em andamento - semaforos OFF; colisoes podem acontecer.',
+    );
+  } else {
+    if (!activeSyncEnabled) {
+      setStatus(
+        stats.total_collisions > 0
+          ? `Simulacao sem sincronizacao encerrada com ${stats.total_collisions} colisao(oes).`
+          : 'Simulacao sem sincronizacao encerrada sem colisao nesta rodada.',
+      );
+      return;
+    }
+
+    const allDone = cars.length > 0 && cars.every((c) => c.state === 'finished');
+    setStatus(allDone ? 'Todas as travessias concluidas.' : 'Simulacao pausada.');
   }
 }
 
-// ── Tabela de threads ─────────────────────────────────────────────────────────
-const STATE_LABEL = {
-  moving:      '● movendo',
-  in_critical: '● região crítica',
-  collided:    '● colidiu',
-  finished:    '● concluído',
-};
-
-const DIR_LABEL = { north: '↓', south: '↑', west: '→', east: '←' };
-
 function refreshThreadTable() {
-  if (!simState.cars.length) return;
-  threadTbody.innerHTML = simState.cars.map(car => `
-    <tr>
-      <td>${car.id}</td>
-      <td>${DIR_LABEL[car.direction] ?? car.direction}</td>
-      <td class="ts-${car.state}">${STATE_LABEL[car.state] ?? car.state}</td>
-      <td>${car.quadrant || '—'}${car.time_in_critical > 0 ? ' · ' + car.time_in_critical.toFixed(1) + 's' : ''}</td>
-      <td>${car.speed ? car.speed.toFixed(1) : '—'}</td>
-    </tr>`).join('');
+  if (!simState.cars.length) {
+    threadTbody.innerHTML = '<tr><td colspan="6" class="empty-row">Nenhuma simulacao iniciada</td></tr>';
+    return;
+  }
+
+  threadTbody.innerHTML = simState.cars.map((car) => {
+    const stateClass = car.state ? `ts-${car.state}` : 'ts-idle';
+    const stateText = car.state ? (STATE_LABEL[car.state] ?? car.state) : '-';
+    const totalTime = car.total_time != null
+      ? `${car.total_time.toFixed(2)}s`
+      : '-';
+    const waitTime = car.wait_time != null
+      ? `${car.wait_time.toFixed(2)}s`
+      : '-';
+
+    return `
+      <tr>
+        <td>${car.id}</td>
+        <td class="${car.vehicle_type === 'truck' ? 'type-truck' : 'type-car'}">
+          ${car.vehicle_type === 'truck' ? 'Caminhao' : 'Carro'}
+        </td>
+        <td>${DIR_LABEL[car.direction] ?? car.direction}</td>
+        <td class="${stateClass}">${stateText}</td>
+        <td class="time-col">${totalTime}</td>
+        <td class="time-col">${waitTime}</td>
+      </tr>`;
+  }).join('');
 }
 
-// ── Log de eventos ────────────────────────────────────────────────────────────
 function refreshLog() {
   if (!localLog.length) {
     logList.innerHTML = '<span class="log-empty">Nenhum evento ainda...</span>';
     return;
   }
+
   logList.innerHTML = [...localLog].reverse()
-    .map(ev => `<div class="log-entry log-${ev.type}">[${ev.time.toFixed(2).padStart(6)}s] ${ev.message}</div>`)
+    .map((ev) => (
+      `<div class="log-entry log-${ev.type}">[${String(ev.time.toFixed(2)).padStart(6)}s] ${ev.message}</div>`
+    ))
     .join('');
 }
 
-// ── Canvas: utilitários ───────────────────────────────────────────────────────
 function rRect(x, y, w, h, r) {
   ctx.beginPath();
   if (ctx.roundRect) {
     ctx.roundRect(x, y, w, h, r);
-  } else {
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y,     x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x,     y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x,     y,     x + r, y);
-    ctx.closePath();
+    return;
   }
+
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
-// ── Canvas: pista ─────────────────────────────────────────────────────────────
 function drawRoad() {
-  // Fundo
-  ctx.fillStyle = '#091a3a';   // fundo — bg Inatel
+  ctx.fillStyle = '#091a3a';
   ctx.fillRect(0, 0, W, H);
 
-  // Asfalto
   ctx.fillStyle = '#374151';
-  ctx.fillRect(CX - ROAD_HALF, 0,  ROAD_HALF * 2, H);   // vertical
-  ctx.fillRect(0, CY - ROAD_HALF,  W, ROAD_HALF * 2);   // horizontal
+  ctx.fillRect(CX - ROAD_HALF, 0, ROAD_HALF * 2, H);
+  ctx.fillRect(0, CY - ROAD_HALF, W, ROAD_HALF * 2);
 
   ctx.save();
-
-  // Bordas externas das vias
   ctx.strokeStyle = '#6b7280';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([]);
   ctx.beginPath();
-  // Via vertical: bordas esquerda e direita (fora da região crítica)
-  ctx.moveTo(CX - ROAD_HALF, 0);   ctx.lineTo(CX - ROAD_HALF, CY1);
-  ctx.moveTo(CX - ROAD_HALF, CY2); ctx.lineTo(CX - ROAD_HALF, H);
-  ctx.moveTo(CX + ROAD_HALF, 0);   ctx.lineTo(CX + ROAD_HALF, CY1);
-  ctx.moveTo(CX + ROAD_HALF, CY2); ctx.lineTo(CX + ROAD_HALF, H);
-  // Via horizontal: bordas superior e inferior
-  ctx.moveTo(0,   CY - ROAD_HALF); ctx.lineTo(CX1, CY - ROAD_HALF);
-  ctx.moveTo(CX2, CY - ROAD_HALF); ctx.lineTo(W,   CY - ROAD_HALF);
-  ctx.moveTo(0,   CY + ROAD_HALF); ctx.lineTo(CX1, CY + ROAD_HALF);
-  ctx.moveTo(CX2, CY + ROAD_HALF); ctx.lineTo(W,   CY + ROAD_HALF);
+  ctx.moveTo(CX1, 0); ctx.lineTo(CX1, CY1);
+  ctx.moveTo(CX1, CY2); ctx.lineTo(CX1, H);
+  ctx.moveTo(CX2, 0); ctx.lineTo(CX2, CY1);
+  ctx.moveTo(CX2, CY2); ctx.lineTo(CX2, H);
+  ctx.moveTo(0, CY1); ctx.lineTo(CX1, CY1);
+  ctx.moveTo(CX2, CY1); ctx.lineTo(W, CY1);
+  ctx.moveTo(0, CY2); ctx.lineTo(CX1, CY2);
+  ctx.moveTo(CX2, CY2); ctx.lineTo(W, CY2);
   ctx.stroke();
 
-  // Divisor central entre pistas (tracejado, fora da região crítica)
   ctx.strokeStyle = '#4b5563';
   ctx.lineWidth = 1;
-  ctx.setLineDash([10, 8]);
+  ctx.setLineDash([8, 6]);
   ctx.beginPath();
-  // Divisor da via vertical (x = 250)
-  ctx.moveTo(CX, 0);   ctx.lineTo(CX, CY1);
+  ctx.moveTo(CX, 0); ctx.lineTo(CX, CY1);
   ctx.moveTo(CX, CY2); ctx.lineTo(CX, H);
-  // Divisor da via horizontal (y = 250)
-  ctx.moveTo(0,   CY); ctx.lineTo(CX1, CY);
-  ctx.moveTo(CX2, CY); ctx.lineTo(W,   CY);
+  ctx.moveTo(0, CY); ctx.lineTo(CX1, CY);
+  ctx.moveTo(CX2, CY); ctx.lineTo(W, CY);
   ctx.stroke();
-
   ctx.restore();
 
-  // Setas de direção por pista
-  ctx.font = 'bold 16px sans-serif';
+  ctx.font = 'bold 13px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // NORTH (↓): pista esquerda da via vertical (x=220)
   ctx.fillStyle = 'rgba(59,130,246,0.35)';
-  ctx.fillText('▼', LANE.north.x, 55);
-  ctx.fillText('▼', LANE.north.x, 115);
-  ctx.fillText('▼', LANE.north.x, H - 115);
-  ctx.fillText('▼', LANE.north.x, H - 55);
+  [55, 115, H - 115, H - 55].forEach((y) => ctx.fillText('v', LANE.north.x, y));
 
-  // SOUTH (↑): pista direita da via vertical (x=280)
-  ctx.fillStyle = 'rgba(168,85,247,0.35)';
-  ctx.fillText('▲', LANE.south.x, 55);
-  ctx.fillText('▲', LANE.south.x, 115);
-  ctx.fillText('▲', LANE.south.x, H - 115);
-  ctx.fillText('▲', LANE.south.x, H - 55);
+  ctx.fillStyle = 'rgba(22,163,74,0.4)';
+  [55, 115, H - 115, H - 55].forEach((y) => ctx.fillText('^', LANE.south.x, y));
 
-  // WEST (►): pista superior da via horizontal (y=220)
   ctx.fillStyle = 'rgba(59,130,246,0.35)';
-  ctx.fillText('►', 55,      LANE.west.y);
-  ctx.fillText('►', 115,     LANE.west.y);
-  ctx.fillText('►', W - 115, LANE.west.y);
-  ctx.fillText('►', W - 55,  LANE.west.y);
+  [55, 115, W - 115, W - 55].forEach((x) => ctx.fillText('>', x, LANE.west.y));
 
-  // EAST (◄): pista inferior da via horizontal (y=280)
-  ctx.fillStyle = 'rgba(168,85,247,0.35)';
-  ctx.fillText('◄', 55,      LANE.east.y);
-  ctx.fillText('◄', 115,     LANE.east.y);
-  ctx.fillText('◄', W - 115, LANE.east.y);
-  ctx.fillText('◄', W - 55,  LANE.east.y);
+  ctx.fillStyle = 'rgba(22,163,74,0.4)';
+  [55, 115, W - 115, W - 55].forEach((x) => ctx.fillText('<', x, LANE.east.y));
 }
 
-// ── Canvas: região crítica (4 quadrantes) ────────────────────────────────────
-//
-//   Q1 (top-left)     NORTH × WEST    cor azul
-//   Q2 (top-right)    SOUTH × WEST    cor âmbar
-//   Q3 (bottom-left)  NORTH × EAST    cor verde
-//   Q4 (bottom-right) SOUTH × EAST    cor roxo
-//
-const MX = W / 2;  // 250 — divisor horizontal dos quadrantes
-const MY = H / 2;  // 250 — divisor vertical dos quadrantes
-
-const QUAD_META = [
-  { name: 'Q1', label: 'N×W', x: CX1, y: CY1, w: MX - CX1, h: MY - CY1, fill: 'rgba(59,130,246,0.10)',  stroke: 'rgba(59,130,246,0.5)'  },
-  { name: 'Q2', label: 'S×W', x: MX,  y: CY1, w: CX2 - MX, h: MY - CY1, fill: 'rgba(245,158,11,0.10)', stroke: 'rgba(245,158,11,0.5)'  },
-  { name: 'Q3', label: 'N×E', x: CX1, y: MY,  w: MX - CX1, h: CY2 - MY, fill: 'rgba(34,197,94,0.10)',  stroke: 'rgba(34,197,94,0.5)'   },
-  { name: 'Q4', label: 'S×E', x: MX,  y: MY,  w: CX2 - MX, h: CY2 - MY, fill: 'rgba(168,85,247,0.10)', stroke: 'rgba(168,85,247,0.5)'  },
-];
-
 function drawCriticalRegion() {
-  // Fundo por quadrante
-  QUAD_META.forEach(q => {
+  QUAD_META.forEach((q) => {
     ctx.fillStyle = q.fill;
     ctx.fillRect(q.x, q.y, q.w, q.h);
   });
 
-  // Linhas divisórias internas (tracejadas)
   ctx.save();
-  ctx.setLineDash([5, 4]);
+  ctx.setLineDash([4, 3]);
   ctx.strokeStyle = 'rgba(255,255,255,0.12)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(MX, CY1); ctx.lineTo(MX, CY2);  // divisor vertical
-  ctx.moveTo(CX1, MY); ctx.lineTo(CX2, MY);   // divisor horizontal
+  ctx.moveTo(CX, CY1); ctx.lineTo(CX, CY2);
+  ctx.moveTo(CX1, CY); ctx.lineTo(CX2, CY);
   ctx.stroke();
   ctx.restore();
 
-  // Borda externa da região crítica
   ctx.save();
-  ctx.setLineDash([7, 5]);
-  ctx.strokeStyle = '#ef4444';
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = '#f97316';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(CX1 + 1, CY1 + 1, CX2 - CX1 - 2, CY2 - CY1 - 2);
   ctx.restore();
 
-  // Rótulos por quadrante (nome + pares de direção)
-  ctx.font = 'bold 9px monospace';
+  ctx.font = 'bold 8px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  QUAD_META.forEach(q => {
+  QUAD_META.forEach((q) => {
     ctx.fillStyle = q.stroke;
-    ctx.fillText(q.name,  q.x + q.w / 2, q.y + q.h / 2 - 6);
-    ctx.fillText(q.label, q.x + q.w / 2, q.y + q.h / 2 + 6);
+    ctx.fillText(q.name, q.x + q.w / 2, q.y + q.h / 2 - 5);
+    ctx.fillText(q.label, q.x + q.w / 2, q.y + q.h / 2 + 5);
   });
 
-  // Título acima da região
-  ctx.fillStyle = 'rgba(239,68,68,0.6)';
-  ctx.font = 'bold 10px monospace';
+  ctx.fillStyle = 'rgba(249,115,22,0.6)';
+  ctx.font = 'bold 9px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('REGIÃO CRÍTICA', (CX1 + CX2) / 2, CY1 - 6);
+  ctx.fillText('REGIAO CRITICA', (CX1 + CX2) / 2, CY1 - 5);
 }
 
-// ── Canvas: carro ─────────────────────────────────────────────────────────────
-function drawCar(car) {
+function drawQuadrantLight(tx, ty, label, occupied) {
+  const tw = 16;
+  const th = 34;
+
+  ctx.fillStyle = '#111827';
+  rRect(tx, ty, tw, th, 3);
+  ctx.fill();
+
+  ctx.strokeStyle = '#374151';
+  ctx.lineWidth = 1;
+  rRect(tx, ty, tw, th, 3);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(tx + tw / 2, ty + 10, 4, 0, Math.PI * 2);
+  ctx.fillStyle = occupied ? '#7f1d1d' : '#1f2937';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(tx + tw / 2, ty + 24, 4, 0, Math.PI * 2);
+  ctx.fillStyle = occupied ? '#f97316' : '#22c55e';
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.38)';
+  ctx.font = '6px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(label, tx + tw / 2, ty + th + 8);
+}
+
+function drawTrafficLights() {
+  const quadrants = getQuadrants();
+  drawQuadrantLight(CX1 - 24, CY1 - 2, 'Q1', !(quadrants.Q1?.free ?? true));
+  drawQuadrantLight(CX2 + 8, CY1 - 2, 'Q2', !(quadrants.Q2?.free ?? true));
+  drawQuadrantLight(CX1 - 24, CY2 - 32, 'Q3', !(quadrants.Q3?.free ?? true));
+  drawQuadrantLight(CX2 + 8, CY2 - 32, 'Q4', !(quadrants.Q4?.free ?? true));
+}
+
+function drawVehicle(car) {
   if (car.state === 'finished') return;
 
   const vertical = car.direction === 'north' || car.direction === 'south';
-  const cw = vertical ? 14 : 22;
-  const ch = vertical ? 22 : 14;
-  const x  = car.x - cw / 2;
-  const y  = car.y - ch / 2;
+  const size = VEHICLE_SIZE[car.vehicle_type] ?? VEHICLE_SIZE.car;
+  const cw = vertical ? size.w : size.h;
+  const ch = vertical ? size.h : size.w;
+  const x = car.x - cw / 2;
+  const y = car.y - ch / 2;
 
-  // Sombra
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
   rRect(x + 2, y + 2, cw, ch, 3);
   ctx.fill();
 
-  // Corpo
-  ctx.fillStyle = COLORS[car.state] || COLORS.moving;
+  ctx.fillStyle = vehicleColor(car);
   rRect(x, y, cw, ch, 3);
   ctx.fill();
 
-  // Para-brisa
   ctx.fillStyle = 'rgba(255,255,255,0.2)';
   if (vertical) {
-    ctx.fillRect(x + 3, y + 3, cw - 6, ch * 0.38);
+    ctx.fillRect(x + 2, y + 2, cw - 4, ch * 0.35);
   } else {
-    ctx.fillRect(x + 3, y + 3, cw * 0.38, ch - 6);
+    ctx.fillRect(x + 2, y + 2, cw * 0.35, ch - 4);
   }
 
-  // Explosão para carros colididos
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.font = `bold ${car.vehicle_type === 'truck' ? 8 : 7}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(car.id, car.x, car.y + 2);
+
+  if (car.state === 'waiting') {
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1.5;
+    rRect(x - 1, y - 1, cw + 2, ch + 2, 4);
+    ctx.stroke();
+  }
+
   if (car.state === 'collided') {
-    ctx.font = '26px serif';
+    ctx.font = '28px serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('💥', car.x, car.y);
   }
 }
 
-// ── Loop de renderização ──────────────────────────────────────────────────────
 function render() {
   drawRoad();
   drawCriticalRegion();
-  simState.cars.forEach(drawCar);
+  if (simState.stats.sync_enabled) {
+    drawTrafficLights();
+  }
+  simState.cars.forEach(drawVehicle);
   requestAnimationFrame(render);
 }
 
-// ── Inicialização ─────────────────────────────────────────────────────────────
+refreshThreadTable();
+refreshModeControls();
 connect();
 render();
