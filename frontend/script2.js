@@ -3,6 +3,10 @@ const BACKEND_PORT = 8001;
 const BACKEND_HTTP = `http://localhost:${BACKEND_PORT}`;
 const BACKEND_WS   = `ws://localhost:${BACKEND_PORT}`;
 
+// index2.html usa rotas isoladas (/api2, /ws2) para não interferir com index.html
+const API_PREFIX = '/api2';
+const WS_PATH    = '/ws2';
+
 // ── Elementos do DOM ──────────────────────────────────────────────────────────
 const canvas       = document.getElementById('sim-canvas');
 const ctx          = canvas.getContext('2d');
@@ -101,7 +105,7 @@ function getQuadrants() {
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 function connect() {
-  const ws = new WebSocket(`${BACKEND_WS}/ws`);
+  const ws = new WebSocket(`${BACKEND_WS}${WS_PATH}`);
 
   ws.onmessage = (ev) => {
     const prev = prevRunning;
@@ -153,7 +157,7 @@ function connect() {
 btnStart.addEventListener('click', async () => {
   localLog = [];
   lastEventCount = 0;
-  await fetch(`${BACKEND_HTTP}/api/start`, {
+  await fetch(`${BACKEND_HTTP}${API_PREFIX}/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sync_enabled: true, scheduling_mode: selectedMode }),
@@ -161,7 +165,7 @@ btnStart.addEventListener('click', async () => {
 });
 
 btnReset.addEventListener('click', async () => {
-  await fetch(`${BACKEND_HTTP}/api/reset`, { method: 'POST' });
+  await fetch(`${BACKEND_HTTP}${API_PREFIX}/reset`, { method: 'POST' });
   localLog = [];
   lastEventCount = 0;
   logList.innerHTML = '<span class="log-empty">Nenhum evento ainda...</span>';
